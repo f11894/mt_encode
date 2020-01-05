@@ -130,9 +130,8 @@ exit /b
 set /a job_num=job_num+1
 set /a end_f_temp=start_f+max_frame_division_interval-1
 echo %start_f% %end_f_temp% %job_num% >>%xargs_txt%
-set /a start_f=start_f+max_frame_division_interval-1
+set /a start_f=start_f+max_frame_division_interval
 set /a end_f_plus=end_f_temp+max_frame_division_interval
-set /a start_f=start_f+1
 if %end_f_plus% GEQ %end_f% (
     set /a job_num=job_num+1
     call echo %start_f% %end_f% %%job_num%% >>%xargs_txt%
