@@ -72,6 +72,7 @@ rem echo LanczosResize(320,180)>>%avs_file%
 rem echo info()>>%avs_file%
 set start_f=0
 if not defined min_frame_division_interval set min_frame_division_interval=25
+if not defined max_frame_division_interval set max_frame_division_interval=250
 for /f "delims=" %%i in ('Type %scenechange_txt%') do (
     call :division %%i
 )
