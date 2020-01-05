@@ -61,10 +61,15 @@ popd
 echo 音声のエンコードを開始 
 if /i "%audio_extension%"=="opus" start "" /min %ffmpeg% -y -i %avs_file% -vn %libopus_option% %audio_file%
 if /i "%audio_extension%"=="m4a"  start "" /min %comspec% /c "%ffmpeg% -y -loglevel quiet -i %avs_file% -vn -f wav - | %qaac% %qaac_option% --ignorelength -o %audio_file% "-" "
-pushd "%TemporaryDir%"
-echo シーンチェンジを検出中 
-%ffprobe% -select_streams v -show_entries frame=pkt_pts -of compact=p=0:nk=1 -f lavfi "movie=%random32%.avs,setpts=N+1,select=gt(scene\,%Scene_change_threshold%)">%scenechange_txt% 2>nul
-popd
+if exist "%~dp1keyframelist.txt" (
+    echo keyframelist.txtからキーフレーム情報を取得します 
+    copy /y "%~dp1keyframelist.txt" %scenechange_txt% >nul 2>&1
+) else (
+    pushd "%TemporaryDir%"
+    echo シーンチェンジを検出中 
+    %ffprobe% -select_streams v -show_entries frame=pkt_pts -of compact=p=0:nk=1 -f lavfi "movie=%random32%.avs,setpts=N+1,select=gt(scene\,%Scene_change_threshold%)">%scenechange_txt% 2>nul
+    popd
+)
 set /a frame_count_plus_1=frame_count+1
 echo %frame_count_plus_1% >>%scenechange_txt%
 rem デバッグ用 
