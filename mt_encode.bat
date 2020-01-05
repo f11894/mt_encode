@@ -65,34 +65,15 @@ pushd "%TemporaryDir%"
 echo シーンチェンジを検出中 
 %ffprobe% -select_streams v -show_entries frame=pkt_pts -of compact=p=0:nk=1 -f lavfi "movie=%random32%.avs,setpts=N+1,select=gt(scene\,%Scene_change_threshold%)">%scenechange_txt% 2>nul
 popd
+set /a frame_count_plus_1=frame_count+1
+echo %frame_count_plus_1% >>%scenechange_txt%
 rem デバッグ用 
-rem echo LanczosResize(128,72)>>%avs_file%
-:no_scene_change_detected
-rem コメントアウトを外すとスレッド数と同じ数だけ動画を分割 
-rem set /a remainder=frame_count%%xargs_threads
-rem if not "%remainder%"=="0" set plus=+1
-rem set /a max_frame_division_interval=frame_count/xargs_threads%plus%
-for %%i in (%scenechange_txt%) do if "%%~zi"=="0" (
-    echo シーンチェンジが検出できませんでした 
-    for /L %%i in (1,%max_frame_division_interval%,%frame_count%) do (
-        set /a job_num=job_num+1
-        set /a start_f=%%i-1
-        set /a end_f=%%i+max_frame_division_interval-2
-        call echo %%start_f%% %%end_f%% %%job_num%% >>%xargs_txt%
-    )
-    set no_scene_change_detected=true
-)
-if "%no_scene_change_detected%"=="true" goto encode
-:scene_change_detected
+rem echo LanczosResize(320,180)>>%avs_file%
+rem echo info()>>%avs_file%
 set start_f=0
 if not defined min_frame_division_interval set min_frame_division_interval=25
 for /f "delims=" %%i in ('Type %scenechange_txt%') do (
     call :division %%i
-)
-set /a frame_count_minus_1=frame_count-1
-if %end_f% LSS %frame_count_minus_1% (
-    set /a job_num=job_num+1
-    call echo %%start_f%% %%frame_count_minus_1%% %%job_num%% >>%xargs_txt%
 )
 :encode
 echo 動画のエンコードを開始 
@@ -136,10 +117,27 @@ exit /b
 
 :division
 set /a end_f=%1-2
-set /a frame_distance=end_f-start_f
+set /a frame_distance=end_f-start_f+1
+if %frame_distance% GTR %max_frame_division_interval% goto division2
 if %frame_distance% GEQ %min_frame_division_interval% (
     set /a job_num=job_num+1
     call echo %start_f% %end_f% %%job_num%% >>%xargs_txt%
     set /a start_f=%1-1
 )
+exit /b
+
+:division2
+set /a job_num=job_num+1
+set /a end_f_temp=start_f+max_frame_division_interval-1
+echo %start_f% %end_f_temp% %job_num% >>%xargs_txt%
+set /a start_f=start_f+max_frame_division_interval-1
+set /a end_f_plus=end_f_temp+max_frame_division_interval
+set /a start_f=start_f+1
+if %end_f_plus% GEQ %end_f% (
+    set /a job_num=job_num+1
+    call echo %start_f% %end_f% %%job_num%% >>%xargs_txt%
+    set /a start_f=%1-1
+    exit /b
+)
+goto division2
 exit /b
