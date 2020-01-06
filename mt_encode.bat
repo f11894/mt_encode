@@ -35,13 +35,14 @@ set "TemporaryDir=%~dp1Temporary\"
 for /f "delims=" %%a in ('PowerShell "-Join (Get-Random -Count 32 -input 0,1,2,3,4,5,6,7,8,9,a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t,u,v,w,x,y,z)"') do set "random32=%%a"
 if not exist "%TemporaryDir%" mkdir "%TemporaryDir%"
 set avs_file="%TemporaryDir%\%random32%.avs"
+for %%i  in ("%TemporaryDir%\%random32%.avs") do set "avs_file_name=%%~nxi"
 set audio_file="%TemporaryDir%%random32%_audio.%audio_extension%"
 set xargs_txt="%TemporaryDir%\%random32%_xargs.txt"
 set scenechange_txt="%TemporaryDir%\%random32%_scenechange.txt"
 set concat_txt="%TemporaryDir%\%random32%_concat.txt"
 if /i "%~x1"==".avs" (
-    set avs_file="%~1"
-    set input_avs=true
+    echo 入力したavsをそのまま使用します 
+    copy /y "%~1" %avs_file% >nul 2>&1
 ) else (
     echo LoadPlugin^("%~dp0tools\plugins64\LSMASHSource.dll"^)
     if /i "%~x1"==".mp4" (
@@ -52,7 +53,6 @@ if /i "%~x1"==".avs" (
         echo V = LWLibavVideoSource^("%~1"^)
     )
     echo AudioDub^(V, A^)
-    set input_avs=false
 )>%avs_file%
 for %%i in (%avs2pipemod64%) do pushd "%%~dpi"
 for /f "tokens=2" %%a in ('.\avs2pipemod64.exe -info %avs_file% ^| find "v:frames"') do set "frame_count=%%a"
@@ -67,7 +67,7 @@ if exist "%~dp1keyframelist.txt" (
 ) else (
     pushd "%TemporaryDir%"
     echo シーンチェンジを検出中 
-    %ffprobe% -select_streams v -show_entries frame=pkt_pts -of compact=p=0:nk=1 -f lavfi "movie=%random32%.avs,setpts=N+1,select=gt(scene\,%Scene_change_threshold%)">%scenechange_txt% 2>nul
+    %ffprobe% -select_streams v -show_entries frame=pkt_pts -of compact=p=0:nk=1 -f lavfi "movie=%avs_file_name%,setpts=N+1,select=gt(scene\,%Scene_change_threshold%)">%scenechange_txt% 2>nul
     popd
 )
 set /a frame_count_plus_1=frame_count+1
@@ -107,7 +107,7 @@ if "%ERRORLEVEL%"=="0" (
     del %concat_txt%
     del %scenechange_txt%
     del %xargs_txt%
-    if "%input_avs%"=="false" del %avs_file%
+    del %avs_file%
 )
 echo,
 popd
