@@ -27,6 +27,7 @@ if "%~1"=="" goto end
 setlocal
 if "%video_encoder%"=="libaom" set sub_bat="%~dp0sub_bat\sub_libaom.bat"&set video_extension=ivf
 if "%video_encoder%"=="libvpx" set sub_bat="%~dp0sub_bat\sub_libvpx.bat"&set video_extension=ivf
+set sub_scenechange="%~dp0sub_bat\sub_scenechange.bat"
 if not defined sub_bat (
     echo エラー 無効なvideo_encoderです:"%video_encoder%"
     goto error_label
@@ -38,6 +39,7 @@ set avs_file="%TemporaryDir%\%random32%.avs"
 for %%i  in ("%TemporaryDir%\%random32%.avs") do set "avs_file_name=%%~nxi"
 set audio_file="%TemporaryDir%%random32%_audio.%audio_extension%"
 set xargs_txt="%TemporaryDir%\%random32%_xargs.txt"
+set scenechange_xargs_txt="%TemporaryDir%\%random32%_scenechange_xargs_txt.txt"
 set scenechange_txt="%TemporaryDir%\%random32%_scenechange.txt"
 set concat_txt="%TemporaryDir%\%random32%_concat.txt"
 if /i "%~x1"==".avs" (
@@ -64,12 +66,29 @@ if /i "%audio_extension%"=="m4a"  start "" /min %comspec% /c "%ffmpeg% -y -logle
 if exist "%~dp1keyframelist.txt" (
     echo keyframelist.txtからキーフレーム情報を取得します 
     copy /y "%~dp1keyframelist.txt" %scenechange_txt% >nul 2>&1
-) else (
-    pushd "%TemporaryDir%"
-    echo シーンチェンジを検出中 
-    %ffprobe% -select_streams v -show_entries frame=pkt_pts -of compact=p=0:nk=1 -f lavfi "movie=%avs_file_name%,setpts=N+1,select=gt(scene\,%Scene_change_threshold%)">%scenechange_txt% 2>nul
-    popd
+    goto frame_count_echo
 )
+:ffprobe
+echo シーンチェンジを検出中 
+set /a scenechange_division_interval=frame_count/xargs_threads+1
+for /L %%i in (1,%scenechange_division_interval%,%frame_count%) do (
+    set /a scenechange_num=scenechange_num+1
+    call :scenechange_mt_avs %%i
+)
+for %%i in (%timer64%) do pushd "%%~dpi"
+for /f "tokens=3" %%a in ('.\timer64.exe %busybox64% xargs -a %scenechange_xargs_txt% -n 3 -P %xargs_threads% %comspec% /c start "" /wait /min %sub_scenechange% ^| find "TotalMilliseconds"') do set "ScenechangeMilliseconds=%%a"
+popd
+for /f "delims=" %%a in ('PowerShell "%ScenechangeMilliseconds%/1000"') do set "ScenechangeSeconds=%%a"
+echo シーンチェンジ検索時間  : %ScenechangeSeconds%秒
+for /L %%i in (1,1,%xargs_threads%) do (
+    if exist "%TemporaryDir%\%random32%_scenechange%%i.txt" (
+        type "%TemporaryDir%\%random32%_scenechange%%i.txt">>%scenechange_txt%
+        del "%TemporaryDir%\%random32%_scenechange%%i.txt"
+    )
+)
+move %scenechange_txt% "%TEMP%\%random32%_scenechange_awk.txt" >nul 2>&1
+%busybox64% awk -v ORS="\r\n" "!a[$0]++" "%TEMP%\%random32%_scenechange_awk.txt" >%scenechange_txt%
+:frame_count_echo
 set /a frame_count_plus_1=frame_count+1
 echo %frame_count_plus_1% >>%scenechange_txt%
 rem デバッグ用 
@@ -89,11 +108,11 @@ echo Total number of jobs    : %job_num%
 echo xargs threads           : %xargs_threads%
 echo,
 for %%i in (%timer64%) do pushd "%%~dpi"
-for /f "tokens=3" %%a in ('.\timer64.exe %busybox64% xargs -a %xargs_txt% -n 3 -P %xargs_threads% %comspec% /c start "" /wait /min %sub_bat% ^| find "TotalMilliseconds"') do set "TotalMilliseconds=%%a"
+for /f "tokens=3" %%a in ('.\timer64.exe %busybox64% xargs -a %xargs_txt% -n 3 -P %xargs_threads% %comspec% /c start "" /wait /min %sub_bat% ^| find "TotalMilliseconds"') do set "EncodeMilliseconds=%%a"
 popd
-for /f "delims=" %%a in ('PowerShell "%TotalMilliseconds%/1000"') do set "TotalSeconds=%%a"
-for /f "delims=" %%a in ('PowerShell "%frame_count%/%TotalSeconds%"') do set "enc_fps=%%a"
-echo Elapsed time(sec)       : %TotalSeconds%
+for /f "delims=" %%a in ('PowerShell "%EncodeMilliseconds%/1000"') do set "EncodeSeconds=%%a"
+for /f "delims=" %%a in ('PowerShell "%frame_count%/%EncodeSeconds%"') do set "enc_fps=%%a"
+echo Elapsed time(sec)       : %EncodeSeconds%
 echo Total encoding fps      : %enc_fps%
 echo,
 pushd "%TemporaryDir%"
@@ -108,6 +127,7 @@ if "%ERRORLEVEL%"=="0" (
     del %scenechange_txt%
     del %xargs_txt%
     del %avs_file%
+    del %scenechange_xargs_txt% 
 )
 echo,
 popd
@@ -145,4 +165,14 @@ if %end_f_plus% GEQ %end_f% (
     exit /b
 )
 goto division2
+exit /b
+
+:scenechange_mt_avs
+copy %avs_file% "%TemporaryDir%\%random32%_scenechange%scenechange_num%.avs" >nul 2>&1
+set /a scenechange_start_f=%1-1
+rem 単純に分割すると境目でおかしくなるので前後5フレームずつ余分に処理する 
+if not "%scenechange_start_f%"=="0" set /a scenechange_start_f=scenechange_start_f-5
+set /a scenechange_end_f=%1+scenechange_division_interval-2+5
+echo trim(%scenechange_start_f%,%scenechange_end_f%)>>"%TemporaryDir%\%random32%_scenechange%scenechange_num%.avs"
+echo "%TemporaryDir%\%random32%_scenechange%scenechange_num%.avs" %scenechange_start_f% %scenechange_num% >>%scenechange_xargs_txt%
 exit /b
