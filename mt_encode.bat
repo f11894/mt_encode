@@ -20,13 +20,14 @@ set aomenc="%~dp0tools\aomenc.exe"
 set vpxenc="%~dp0tools\vpxenc.exe"
 set qaac=
 set avs2pipemod64="%~dp0tools\avs2pipemod64.exe"
+set LSMASHSource="%~dp0tools\plugins64\LSMASHSource.dll"
 set busybox64="%~dp0tools\busybox64.exe"
 rem -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+if "%video_encoder%"=="libaom" set sub_bat="%~dp0sub_bat\sub_libaom.bat"&set video_extension=ivf
+if "%video_encoder%"=="libvpx" set sub_bat="%~dp0sub_bat\sub_libvpx.bat"&set video_extension=ivf
 :start
 if "%~1"=="" goto end
 setlocal
-if "%video_encoder%"=="libaom" set sub_bat="%~dp0sub_bat\sub_libaom.bat"&set video_extension=ivf
-if "%video_encoder%"=="libvpx" set sub_bat="%~dp0sub_bat\sub_libvpx.bat"&set video_extension=ivf
 if not defined sub_bat (
     echo エラー 無効なvideo_encoderです:"%video_encoder%"
     goto error_label
@@ -44,7 +45,7 @@ if /i "%~x1"==".avs" (
     echo 入力したavsをそのまま使用します 
     copy /y "%~1" %avs_file% >nul 2>&1
 ) else (
-    echo LoadPlugin^("%~dp0tools\plugins64\LSMASHSource.dll"^)
+    echo LoadPlugin^(%LSMASHSource%^)
     if /i "%~x1"==".mp4" (
         echo A = LSMASHAudioSource^("%~1"^)
         echo V = LSMASHVideoSource^("%~1"^)
