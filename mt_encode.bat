@@ -1,6 +1,6 @@
 @echo off
 rem -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-set xargs_threads=4
+set xargs_threads=6
 set Scene_change_threshold=0.45
 set min_frame_division_interval=25
 set max_frame_division_interval=250
@@ -8,8 +8,8 @@ set video_encoder=libvpx
 set audio_extension=opus
 set output_extension=mkv
 
-set libaom_option=--cpu-used=1 --row-mt=1 --tile-columns=2 --tile-rows=2 --threads=4 --end-usage=q --cq-level=35 --kf-max-dist=250 --kf-min-dist=250
-set libvpx_option=--cpu-used=1 --row-mt=1 --tile-columns=2 --tile-rows=2 --threads=4 --end-usage=q --cq-level=35 --kf-max-dist=250 --kf-min-dist=250 --auto-alt-ref=6
+set libaom_option=--cpu-used=4 --row-mt=0 --tile-columns=1 --tile-rows=0 --threads=2 --end-usage=q --cq-level=35 --kf-max-dist=250 --kf-min-dist=250
+set libvpx_option=--cpu-used=1 --row-mt=0 --tile-columns=1 --tile-rows=0 --threads=2 --end-usage=q --cq-level=35 --kf-max-dist=250 --kf-min-dist=250 --auto-alt-ref=6
 set libopus_option=-acodec libopus -b:a 128K -frame_duration 60
 set qaac_option=-q 2 --tvbr 82
 
