@@ -82,6 +82,12 @@ if not defined max_frame_division_interval set max_frame_division_interval=250
 for /f "delims=" %%i in ('Type %scenechange_txt%') do (
     call :division %%i
 )
+set /a frame_count_minus1=frame_count-1
+find "%frame_count_minus1%" %xargs_txt% >nul 2>&1
+if not "%ERRORLEVEL%"=="0" (
+    set /a job_num=job_num+1
+    call echo %start_f% %frame_count_minus1% %%job_num%% >>%xargs_txt%
+)
 :encode
 echo 動画のエンコードを開始 
 echo,
